@@ -1,0 +1,23 @@
+# SQLite database
+data/*.db
+data/*.db-*
+
+# Android / Gradle
+.gradle/
+**/build/
+*.iml
+.idea/
+local.properties
+.DS_Store
+
+# Node & Python
+node_modules/
+package-lock.json
+__pycache__/
+*.pyc
+
+# Logs
+*.log
+
+# Binaires APK (conservés localement dans dist/)
+dist/*.apk

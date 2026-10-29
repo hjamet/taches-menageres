@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0f172a">
+  <title>Tâches Ménagères — Henri & Annabelle</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- En-tête de l'application -->
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-icon">✨</span>
+      <span class="brand-title">Tâches Ménagères</span>
+    </div>
+
+    <!-- Sélecteur de profil actif -->
+    <div class="profile-pill-selector" id="profileSelector">
+      <button type="button" class="profile-pill active" data-person="Henri">Henri</button>
+      <button type="button" class="profile-pill" data-person="Annabelle">Annabelle</button>
+    </div>
+  </header>
+
+  <!-- Contenu des onglets -->
+  <main class="app-content">
+
+    <!-- ONGLET 1 : CHRONOMETRE -->
+    <section id="panel-timer" class="tab-panel active">
+      <div class="timer-view">
+        <div class="timer-card">
+          <div class="timer-status-badge" id="timerStatusBadge">
+            <span class="status-dot">●</span>
+            <span id="timerStatusText">Prêt à démarrer</span>
+          </div>
+
+          <div class="timer-digits" id="timerDigits">00:00:00</div>
+          <div class="timer-person-indicator" id="timerPersonIndicator">Profil actif : Henri</div>
+        </div>
+
+        <div class="timer-actions">
+          <button type="button" class="btn-primary-big" id="btnMainTimer">
+            <span id="btnMainTimerIcon">▶</span>
+            <span id="btnMainTimerLabel">DÉMARRER UNE TÂCHE</span>
+          </button>
+
+          <div class="timer-sub-actions" id="timerSubActions" style="display: none;">
+            <button type="button" class="btn-secondary" id="btnPauseTimer">
+              <span id="btnPauseIcon">⏸</span>
+              <span id="btnPauseLabel">Pause</span>
+            </button>
+            <button type="button" class="btn-secondary" id="btnCancelTimer">
+              <span>✕</span> Annuler
+            </button>
+          </div>
+
+          <button type="button" class="btn-ghost" id="btnManualEntry">
+            + Saisie manuelle d'une tâche passée
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ONGLET 2 : STATISTIQUES & BILAN -->
+    <section id="panel-stats" class="tab-panel">
+      <div class="stats-header">
+        <div class="filter-period-pills" id="statsPeriodFilter">
+          <button type="button" class="filter-pill active" data-period="all">Tout</button>
+          <button type="button" class="filter-pill" data-period="today">Aujourd'hui</button>
+          <button type="button" class="filter-pill" data-period="7days">7 jours</button>
+          <button type="button" class="filter-pill" data-period="30days">30 jours</button>
+        </div>
+
+        <div class="stats-card-grid">
+          <div class="stat-box henri">
+            <span class="stat-box-title">Henri</span>
+            <span class="stat-box-time" id="statHenriTime">0m</span>
+            <span class="stat-box-sub" id="statHenriSub">0 session (0%)</span>
+          </div>
+          <div class="stat-box annabelle">
+            <span class="stat-box-title">Annabelle</span>
+            <span class="stat-box-time" id="statAnnabelleTime">0m</span>
+            <span class="stat-box-sub" id="statAnnabelleSub">0 session (0%)</span>
+          </div>
+        </div>
+
+        <div class="stats-bar-wrapper">
+          <div class="progress-labels">
+            <span class="henri-label" id="labelHenriPct">Henri : 0%</span>
+            <span class="annabelle-label" id="labelAnnabellePct">Annabelle : 0%</span>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-bar-henri" id="progressBarHenri" style="width: 50%;"></div>
+            <div class="progress-bar-annabelle" id="progressBarAnnabelle" style="width: 50%;"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stats-breakdown-section">
+        <h3 class="section-label">Répartition par pièce</h3>
+        <div id="statsRoomsList" class="stats-list"></div>
+      </div>
+
+      <div class="stats-breakdown-section" style="margin-top: 24px;">
+        <h3 class="section-label">Répartition détaillée par tâche</h3>
+        <div id="statsTagsList" class="stats-list"></div>
+      </div>
+    </section>
+
+    <!-- ONGLET 3 : HISTORIQUE & CSV -->
+    <section id="panel-history" class="tab-panel">
+      <div class="history-actions-bar">
+        <button type="button" class="btn-secondary" id="btnExportCsv">
+          📥 Exporter CSV
+        </button>
+        <button type="button" class="btn-secondary" id="btnImportCsv">
+          📤 Importer CSV
+        </button>
+        <button type="button" class="btn-secondary" id="btnExportJson">
+          🔒 Sauvegarde JSON
+        </button>
+        <button type="button" class="btn-secondary" id="btnImportJson">
+          📂 Restaurer JSON
+        </button>
+      </div>
+
+      <input type="file" id="fileCsvInput" accept=".csv,text/csv" style="display: none;">
+      <input type="file" id="fileJsonInput" accept=".json,application/json" style="display: none;">
+
+      <div class="history-filter-row">
+        <select id="historyPersonFilter" class="text-input" style="padding: 8px;">
+          <option value="all">Toutes les personnes</option>
+          <option value="Henri">Henri uniquement</option>
+          <option value="Annabelle">Annabelle uniquement</option>
+        </select>
+        <select id="historyRoomFilter" class="text-input" style="padding: 8px;">
+          <option value="all">Toutes les pièces</option>
+        </select>
+      </div>
+
+      <div class="history-list" id="historyList"></div>
+    </section>
+
+  </main>
+
+  <!-- MODALE DE QUALIFICATION / SAISIE DE TÂCHE -->
+  <div class="modal-overlay" id="taskModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modalTitle">Qualifier la tâche</h2>
+        <button type="button" class="modal-close" id="btnModalClose">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Étape 1 : Choix de la / des pièces -->
+        <div>
+          <label class="section-label">1. Choisir la ou les pièces</label>
+          <div class="room-grid" id="modalRoomGrid"></div>
+        </div>
+
+        <!-- Étape 2 : Choix des tags correspondants -->
+        <div>
+          <label class="section-label">2. Choisir les tâches effectuées</label>
+          <div class="tags-container" id="modalTagsContainer"></div>
+          
+          <div class="add-custom-tag-row">
+            <input type="text" id="inputCustomTag" class="custom-tag-input" placeholder="Ajouter une tâche personnalisée...">
+            <button type="button" class="btn-small" id="btnAddCustomTag">+ Ajouter</button>
+          </div>
+        </div>
+
+        <!-- Ajustement de la durée -->
+        <div>
+          <label class="section-label">Durée</label>
+          <div class="duration-adjust-row">
+            <input type="number" id="inputDurationMinutes" class="text-input" min="1" max="1440" value="15">
+            <span>minutes</span>
+            <span style="font-size: 0.8rem; color: var(--text-dim);" id="durationFormattedPreview">(0h 15m)</span>
+          </div>
+        </div>
+
+        <!-- Note optionnelle -->
+        <div>
+          <label class="section-label">Note optionnelle</label>
+          <input type="text" id="inputNote" class="text-input" placeholder="Détail ou remarque particulière...">
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" id="btnModalCancel">Annuler</button>
+        <button type="button" class="btn-primary-big" id="btnModalSave" style="padding: 12px 18px; font-size: 1rem;">
+          💾 Enregistrer la tâche
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Barre de navigation inférieure -->
+  <nav class="tab-nav">
+    <button type="button" class="tab-btn active" data-tab="timer">
+      <span class="tab-icon">⏱️</span>
+      <span>Timer</span>
+    </button>
+    <button type="button" class="tab-btn" data-tab="stats">
+      <span class="tab-icon">📊</span>
+      <span>Bilan</span>
+    </button>
+    <button type="button" class="tab-btn" data-tab="history">
+      <span class="tab-icon">📁</span>
+      <span>Journal & CSV</span>
+    </button>
+  </nav>
+
+  <!-- Conteneur des notifications toast -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Scripts -->
+  <script type="module" src="core.js"></script>
+  <script type="module" src="app.js"></script>
+  <script>
+    // Enregistrement PWA Service Worker si supporté
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW register fail:', err));
+      });
+    }
+  </script>
+</body>
+</html>
