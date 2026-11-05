@@ -13,6 +13,12 @@
   --accent-start: #10b981;
   --accent-stop: #ef4444;
   --accent-pause: #f59e0b;
+  --collab-henri: #6366f1;
+  --collab-henri-soft: #818cf8;
+  --collab-annabelle: #14b8a6;
+  --collab-annabelle-soft: #2dd4bf;
+  --gauge-track: rgba(255, 255, 255, 0.08);
+  --gauge-fill: #94a3b8;
   --border: #374151;
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -673,12 +679,12 @@ body {
   gap: 10px;
 }
 
-/* Onglet 2 : Statistiques */
+/* Onglet 2 : Statistiques & Bilan */
 .stats-header {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 16px;
+  margin-bottom: 28px;
 }
 
 .filter-period-pills {
@@ -697,39 +703,41 @@ body {
   color: var(--text-dim);
   font-size: 0.8rem;
   font-weight: 600;
-  padding: 6px;
+  padding: 8px 6px;
   border-radius: var(--radius-sm);
   cursor: pointer;
   text-align: center;
+  transition: all 0.15s ease;
 }
 
 .filter-pill.active {
   background-color: var(--bg-card);
   color: var(--text-main);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .stats-card-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 14px;
 }
 
 .stat-box {
   background-color: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 14px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
 .stat-box.henri {
-  border-top: 3px solid var(--accent-henri);
+  border-top: 3px solid var(--collab-henri);
 }
 
 .stat-box.annabelle {
-  border-top: 3px solid var(--accent-annabelle);
+  border-top: 3px solid var(--collab-annabelle);
 }
 
 .stat-box-title {
@@ -739,8 +747,8 @@ body {
 }
 
 .stat-box-time {
-  font-size: 1.5rem;
-  font-weight: 700;
+  font-size: 1.55rem;
+  font-weight: 800;
   color: #ffffff;
 }
 
@@ -753,10 +761,10 @@ body {
   background-color: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 14px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .progress-bar-container {
@@ -764,17 +772,18 @@ body {
   background-color: var(--bg-card);
   border-radius: var(--radius-full);
   display: flex;
-  overflow: hidden;
+  overflow: clip;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .progress-bar-henri {
-  background-color: var(--accent-henri);
+  background-color: var(--collab-henri);
   height: 100%;
   transition: width 0.3s ease;
 }
 
 .progress-bar-annabelle {
-  background-color: var(--accent-annabelle);
+  background-color: var(--collab-annabelle);
   height: 100%;
   transition: width 0.3s ease;
 }
@@ -782,34 +791,182 @@ body {
 .progress-labels {
   display: flex;
   justify-content: space-between;
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 .progress-labels .henri-label {
-  color: #60a5fa;
+  color: var(--collab-henri-soft);
 }
 
 .progress-labels .annabelle-label {
-  color: #f472b6;
+  color: var(--collab-annabelle-soft);
 }
 
-/* Tables et listes de statistiques */
-.stats-breakdown-section {
-  margin-top: 16px;
+/* Résumé d'équipe chaleureux */
+.stats-team-summary {
+  margin-bottom: 28px;
+}
+
+.team-summary-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.team-summary-card.empty {
+  text-align: center;
+  align-items: center;
+  padding: 24px 20px;
+  gap: 8px;
+}
+
+.team-summary-empty-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-top: 4px;
+}
+
+.team-summary-empty-text {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  max-width: 380px;
+}
+
+.team-summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 12px;
+}
+
+.team-summary-badge {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #a78bfa;
+  letter-spacing: 0.02em;
+}
+
+.team-summary-total {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.team-summary-total strong {
+  color: #ffffff;
+}
+
+.team-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 600px) {
+  .team-summary-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+}
+
+.team-summary-col {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
+.summary-col-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+
+.summary-mini-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.summary-mini-item {
+  background-color: var(--bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.summary-mini-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.summary-mini-name {
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.summary-mini-time {
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.summary-mini-sub {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+/* Sections de listes du bilan */
+.stats-breakdown-section {
+  margin-bottom: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.stats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Cartes de répartition (Par pièce et Par tâche) */
+.breakdown-card,
 .breakdown-item {
   background-color: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 12px 14px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.15s ease;
+}
+
+.breakdown-card:hover,
+.breakdown-item:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.breakdown-card-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 12px;
 }
 
 .breakdown-info {
@@ -819,8 +976,8 @@ body {
 }
 
 .breakdown-title {
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-size: 1rem;
+  font-weight: 700;
   color: #ffffff;
 }
 
@@ -833,18 +990,123 @@ body {
   text-align: right;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  align-items: flex-end;
+  gap: 4px;
 }
 
 .breakdown-time {
-  font-size: 1rem;
+  font-size: 1.1rem;
   font-weight: 700;
   color: #ffffff;
 }
 
-.breakdown-split {
-  font-size: 0.75rem;
-  color: var(--text-muted);
+.breakdown-importance-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  background-color: rgba(255, 255, 255, 0.06);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+
+/* Jauge fine d'importance relative */
+.relative-gauge-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.relative-gauge-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.relative-gauge-track {
+  flex: 1;
+  height: 4px;
+  background-color: var(--gauge-track);
+  border-radius: var(--radius-full);
+  overflow: clip;
+}
+
+.relative-gauge-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #64748b 0%, var(--gauge-fill) 100%);
+  border-radius: var(--radius-full);
+  transition: width 0.3s ease;
+}
+
+/* Barre empilée bicolore collaborative */
+.collab-split-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.collab-split-bar {
+  height: 12px;
+  background-color: var(--bg-card);
+  border-radius: var(--radius-full);
+  display: flex;
+  overflow: clip;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.collab-split-bar.compact {
+  height: 8px;
+}
+
+.collab-bar-henri {
+  background-color: var(--collab-henri);
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.collab-bar-annabelle {
+  background-color: var(--collab-annabelle);
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.collab-split-legend {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.collab-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.collab-legend-item.henri {
+  color: var(--collab-henri-soft);
+}
+
+.collab-legend-item.annabelle {
+  color: var(--collab-annabelle-soft);
+}
+
+.collab-dot {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.collab-dot.henri {
+  color: var(--collab-henri);
+}
+
+.collab-dot.annabelle {
+  color: var(--collab-annabelle);
 }
 
 /* Onglet 3 : Historique & CSV */

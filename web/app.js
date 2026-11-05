@@ -112,6 +112,7 @@ const DOM = {
   labelAnnabellePct: document.getElementById("labelAnnabellePct"),
   progressBarHenri: document.getElementById("progressBarHenri"),
   progressBarAnnabelle: document.getElementById("progressBarAnnabelle"),
+  statsTeamSummary: document.getElementById("statsTeamSummary"),
   statsRoomsList: document.getElementById("statsRoomsList"),
   statsTagsList: document.getElementById("statsTagsList"),
 
@@ -608,6 +609,102 @@ function saveModalTask() {
 }
 
 // Rendu des Statistiques (Onglet 2)
+function computeSplitPcts(henriSec, annabelleSec, totalSec) {
+  if (!totalSec || totalSec <= 0) {
+    return { henriPct: 50, annabellePct: 50, isZero: true };
+  }
+  if (henriSec > 0 && annabelleSec <= 0) {
+    return { henriPct: 100, annabellePct: 0, isZero: false };
+  }
+  if (annabelleSec > 0 && henriSec <= 0) {
+    return { henriPct: 0, annabellePct: 100, isZero: false };
+  }
+  let hPct = Math.round((henriSec / totalSec) * 100);
+  let aPct = 100 - hPct;
+  if (henriSec > 0 && hPct === 0) {
+    hPct = 1;
+    aPct = 99;
+  } else if (annabelleSec > 0 && aPct === 0) {
+    aPct = 1;
+    hPct = 99;
+  }
+  return { henriPct: hPct, annabellePct: aPct, isZero: false };
+}
+
+function renderTeamSummary(stats) {
+  if (!DOM.statsTeamSummary) return;
+
+  if (stats.totalSeconds <= 0) {
+    DOM.statsTeamSummary.innerHTML = `
+      <div class="team-summary-card empty">
+        <div class="team-summary-badge">🤝 Entraide & Esprit d'équipe</div>
+        <div class="team-summary-empty-title">Aucune tâche enregistrée pour cette période</div>
+        <p class="team-summary-empty-text">Lancez un chronomètre ou saisissez une tâche passée pour visualiser l'équilibre du foyer.</p>
+      </div>
+    `;
+    return;
+  }
+
+  const topRooms = stats.byRoom.slice(0, 2);
+  const topTags = stats.byTag.slice(0, 2);
+
+  let roomsHtml = "";
+  for (const r of topRooms) {
+    const icon = (Core.DEFAULT_TAXONOMY.find((t) => t.room === r.room) || {}).icon || "🏠";
+    const split = computeSplitPcts(r.henriSeconds, r.annabelleSeconds, r.totalSeconds);
+    roomsHtml += `
+      <div class="summary-mini-item">
+        <div class="summary-mini-header">
+          <span class="summary-mini-name">${icon} ${r.room}</span>
+          <span class="summary-mini-time">${Core.formatDurationHm(r.totalSeconds)}</span>
+        </div>
+        <div class="collab-split-bar compact" role="progressbar" aria-label="Répartition collaborative ${r.room}" aria-valuenow="${split.henriPct}" aria-valuemin="0" aria-valuemax="100">
+          <div class="collab-bar-henri" style="width: ${split.henriPct}%;"></div>
+          <div class="collab-bar-annabelle" style="width: ${split.annabellePct}%;"></div>
+        </div>
+        <div class="summary-mini-sub">Henri ${split.henriPct}% · Annabelle ${split.annabellePct}%</div>
+      </div>
+    `;
+  }
+
+  let tagsHtml = "";
+  for (const t of topTags) {
+    const split = computeSplitPcts(t.henriSeconds, t.annabelleSeconds, t.totalSeconds);
+    tagsHtml += `
+      <div class="summary-mini-item">
+        <div class="summary-mini-header">
+          <span class="summary-mini-name">✨ ${t.tag}</span>
+          <span class="summary-mini-time">${Core.formatDurationHm(t.totalSeconds)}</span>
+        </div>
+        <div class="collab-split-bar compact" role="progressbar" aria-label="Répartition collaborative ${t.tag}" aria-valuenow="${split.henriPct}" aria-valuemin="0" aria-valuemax="100">
+          <div class="collab-bar-henri" style="width: ${split.henriPct}%;"></div>
+          <div class="collab-bar-annabelle" style="width: ${split.annabellePct}%;"></div>
+        </div>
+        <div class="summary-mini-sub">Henri ${split.henriPct}% · Annabelle ${split.annabellePct}%</div>
+      </div>
+    `;
+  }
+
+  DOM.statsTeamSummary.innerHTML = `
+    <div class="team-summary-card">
+      <div class="team-summary-header">
+        <div class="team-summary-badge">🤝 Entraide & Complémentarité</div>
+        <div class="team-summary-total">Total partagé : <strong>${Core.formatDurationHm(stats.totalSeconds)}</strong> (${stats.totalSessions} session${stats.totalSessions > 1 ? "s" : ""})</div>
+      </div>
+      <div class="team-summary-grid">
+        <div class="team-summary-col">
+          <div class="summary-col-label">Grandes pièces principales</div>
+          <div class="summary-mini-list">${roomsHtml || "<p class='empty-mini'>Aucune pièce</p>"}</div>
+        </div>
+        <div class="team-summary-col">
+          <div class="summary-col-label">Tâches phares du foyer</div>
+          <div class="summary-mini-list">${tagsHtml || "<p class='empty-mini'>Aucune tâche</p>"}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderStats() {
   const stats = Core.computeStats(state.sessions, state.statsPeriod);
 
@@ -628,23 +725,59 @@ function renderStats() {
     DOM.progressBarAnnabelle.style.width = "50%";
   }
 
+  // Résumé visuel chaleureux d'équipe
+  renderTeamSummary(stats);
+
   // Répartition par pièce
   DOM.statsRoomsList.innerHTML = "";
   if (stats.byRoom.length === 0) {
     DOM.statsRoomsList.innerHTML = `<div class="empty-state"><p>Aucune session pour cette période.</p></div>`;
   } else {
+    const maxRoomSeconds = Math.max(...stats.byRoom.map((r) => r.totalSeconds), 1);
+
     for (const r of stats.byRoom) {
       const item = document.createElement("div");
-      item.className = "breakdown-item";
+      item.className = "breakdown-card";
       const icon = (Core.DEFAULT_TAXONOMY.find((t) => t.room === r.room) || {}).icon || "🏠";
+
+      const totalDur = r.totalSeconds;
+      const split = computeSplitPcts(r.henriSeconds, r.annabelleSeconds, totalDur);
+      const importancePct = Math.max(1, Math.round((totalDur / maxRoomSeconds) * 100));
+
       item.innerHTML = `
-        <div class="breakdown-info">
-          <div class="breakdown-title">${icon} ${r.room}</div>
-          <div class="breakdown-sub">${r.count} session${r.count > 1 ? "s" : ""}</div>
+        <div class="breakdown-card-header">
+          <div class="breakdown-info">
+            <div class="breakdown-title">${icon} ${r.room}</div>
+            <div class="breakdown-sub">${r.count} session${r.count > 1 ? "s" : ""}</div>
+          </div>
+          <div class="breakdown-metrics">
+            <div class="breakdown-time">${Core.formatDurationHm(totalDur)}</div>
+            <div class="breakdown-importance-badge" title="Poids relatif par rapport à la pièce la plus entretenue">
+              ${importancePct}% du max
+            </div>
+          </div>
         </div>
-        <div class="breakdown-metrics">
-          <div class="breakdown-time">${Core.formatDurationHm(r.totalSeconds)}</div>
-          <div class="breakdown-split">H: ${Core.formatDurationHm(r.henriSeconds)} | A: ${Core.formatDurationHm(r.annabelleSeconds)}</div>
+
+        <div class="relative-gauge-row" title="Importance relative dans le foyer : ${importancePct}%">
+          <div class="relative-gauge-label">Activité relative</div>
+          <div class="relative-gauge-track">
+            <div class="relative-gauge-bar" style="width: ${importancePct}%;"></div>
+          </div>
+        </div>
+
+        <div class="collab-split-wrapper">
+          <div class="collab-split-bar" role="progressbar" aria-label="Répartition du temps pour ${r.room}" aria-valuenow="${split.henriPct}" aria-valuemin="0" aria-valuemax="100">
+            <div class="collab-bar-henri" style="width: ${split.henriPct}%;" title="Henri : ${split.henriPct}%"></div>
+            <div class="collab-bar-annabelle" style="width: ${split.annabellePct}%;" title="Annabelle : ${split.annabellePct}%"></div>
+          </div>
+          <div class="collab-split-legend">
+            <span class="collab-legend-item henri">
+              <span class="collab-dot henri">●</span> Henri ${Core.formatDurationHm(r.henriSeconds)} (${split.henriPct}%)
+            </span>
+            <span class="collab-legend-item annabelle">
+              <span class="collab-dot annabelle">●</span> Annabelle ${Core.formatDurationHm(r.annabelleSeconds)} (${split.annabellePct}%)
+            </span>
+          </div>
         </div>
       `;
       DOM.statsRoomsList.appendChild(item);
@@ -656,17 +789,50 @@ function renderStats() {
   if (stats.byTag.length === 0) {
     DOM.statsTagsList.innerHTML = `<div class="empty-state"><p>Aucune tâche pour cette période.</p></div>`;
   } else {
+    const maxTagSeconds = Math.max(...stats.byTag.map((t) => t.totalSeconds), 1);
+
     for (const t of stats.byTag) {
       const item = document.createElement("div");
-      item.className = "breakdown-item";
+      item.className = "breakdown-card";
+
+      const totalDur = t.totalSeconds;
+      const split = computeSplitPcts(t.henriSeconds, t.annabelleSeconds, totalDur);
+      const importancePct = Math.max(1, Math.round((totalDur / maxTagSeconds) * 100));
+
       item.innerHTML = `
-        <div class="breakdown-info">
-          <div class="breakdown-title">${t.tag}</div>
-          <div class="breakdown-sub">${t.count} session${t.count > 1 ? "s" : ""} (Moyenne : ${Core.formatDurationHm(t.avgSeconds)}/session)</div>
+        <div class="breakdown-card-header">
+          <div class="breakdown-info">
+            <div class="breakdown-title">✨ ${t.tag}</div>
+            <div class="breakdown-sub">${t.count} session${t.count > 1 ? "s" : ""} · Moyenne : ${Core.formatDurationHm(t.avgSeconds)}</div>
+          </div>
+          <div class="breakdown-metrics">
+            <div class="breakdown-time">${Core.formatDurationHm(totalDur)}</div>
+            <div class="breakdown-importance-badge" title="Poids relatif par rapport à la tâche la plus fréquente">
+              ${importancePct}% du max
+            </div>
+          </div>
         </div>
-        <div class="breakdown-metrics">
-          <div class="breakdown-time">${Core.formatDurationHm(t.totalSeconds)}</div>
-          <div class="breakdown-split">H: ${Core.formatDurationHm(t.henriSeconds)} | A: ${Core.formatDurationHm(t.annabelleSeconds)}</div>
+
+        <div class="relative-gauge-row" title="Importance relative dans le foyer : ${importancePct}%">
+          <div class="relative-gauge-label">Activité relative</div>
+          <div class="relative-gauge-track">
+            <div class="relative-gauge-bar" style="width: ${importancePct}%;"></div>
+          </div>
+        </div>
+
+        <div class="collab-split-wrapper">
+          <div class="collab-split-bar" role="progressbar" aria-label="Répartition du temps pour ${t.tag}" aria-valuenow="${split.henriPct}" aria-valuemin="0" aria-valuemax="100">
+            <div class="collab-bar-henri" style="width: ${split.henriPct}%;" title="Henri : ${split.henriPct}%"></div>
+            <div class="collab-bar-annabelle" style="width: ${split.annabellePct}%;" title="Annabelle : ${split.annabellePct}%"></div>
+          </div>
+          <div class="collab-split-legend">
+            <span class="collab-legend-item henri">
+              <span class="collab-dot henri">●</span> Henri ${Core.formatDurationHm(t.henriSeconds)} (${split.henriPct}%)
+            </span>
+            <span class="collab-legend-item annabelle">
+              <span class="collab-dot annabelle">●</span> Annabelle ${Core.formatDurationHm(t.annabelleSeconds)} (${split.annabellePct}%)
+            </span>
+          </div>
         </div>
       `;
       DOM.statsTagsList.appendChild(item);
