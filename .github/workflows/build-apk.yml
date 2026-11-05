@@ -1,0 +1,76 @@
+name: Build and Release Android APK
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Build & Publish Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Synchronize Web Assets to Android
+        run: |
+          mkdir -p android/app/src/main/assets
+          cp -r web/* android/app/src/main/assets/
+
+      - name: Build Debug APK with Gradle
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+
+      - name: Stage APK to dist/
+        run: |
+          mkdir -p dist
+          APK_PATH=$(find android/app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then
+            echo "::error::Aucun APK généré dans android/app/build/outputs/apk/debug/"
+            exit 1
+          fi
+          cp "$APK_PATH" dist/taches-menageres-debug.apk
+          ls -lh dist/taches-menageres-debug.apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: taches-menageres-apk
+          path: dist/taches-menageres-debug.apk
+          if-no-files-found: error
+
+      - name: Publish GitHub Release (latest)
+        uses: softprops/action-gh-release@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          tag_name: latest
+          name: "Tâches Ménagères APK (Dernière version)"
+          body: |
+            ## ✨ Application Android Tâches Ménagères (Henri & Annabelle)
+            
+            APK Debug compilé automatiquement par GitHub Actions à chaque mise à jour de `main`.
+            
+            - **Téléchargement direct** : [taches-menageres-debug.apk](https://github.com/hjamet/taches-menageres/releases/download/latest/taches-menageres-debug.apk)
+            - **Commit source** : `${{ github.sha }}`
+          files: dist/taches-menageres-debug.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -4,6 +4,30 @@ import * as Core from "./core.js";
 const STORAGE_KEY_SESSIONS = "taches_menageres_sessions";
 const STORAGE_KEY_PROFILE = "taches_menageres_active_profile";
 const STORAGE_KEY_TIMER = "taches_menageres_timer_state";
+const STORAGE_KEY_CUSTOM_TAGS = Core.STORAGE_KEY_CUSTOM_TAGS || "taches_menageres_custom_tags";
+
+function loadCustomTags() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_CUSTOM_TAGS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.error("Erreur lecture custom tags:", err);
+  }
+  return {};
+}
+
+function saveCustomTags() {
+  try {
+    localStorage.setItem(STORAGE_KEY_CUSTOM_TAGS, JSON.stringify(state.customTagsByRoom));
+  } catch (err) {
+    console.error("Erreur écriture custom tags:", err);
+  }
+}
 
 // État global de l'application
 const state = {
@@ -13,6 +37,7 @@ const state = {
   timerIntervalId: null,
   activeTab: "timer",
   statsPeriod: "all",
+  customTagsByRoom: loadCustomTags(),
 
   // État de la modale en cours
   modal: {
@@ -400,37 +425,50 @@ function renderModalTags() {
     return;
   }
 
-  // Récupérer tous les tags des pièces sélectionnées
+  // Récupérer tous les tags des pièces sélectionnées (défaut + personnalisés persistés)
   for (const roomName of state.modal.selectedRooms) {
-    const category = Core.DEFAULT_TAXONOMY.find((t) => t.room === roomName);
-    if (!category) continue;
+    const category = Core.DEFAULT_TAXONOMY.find((t) => t.room === roomName) || { icon: "🏠" };
+    const roomTags = Core.getRoomTags(roomName, state.customTagsByRoom);
 
-    for (const tagName of category.tags) {
-      const fullTag = `${roomName} > ${tagName}`;
+    for (const tagObj of roomTags) {
+      const fullTag = `${roomName} > ${tagObj.name}`;
       const chip = document.createElement("button");
       chip.type = "button";
       chip.className = "tag-chip";
       if (state.modal.selectedTags.includes(fullTag)) {
         chip.classList.add("selected");
       }
-      chip.textContent = `${category.icon} ${tagName}`;
-      chip.addEventListener("click", () => {
+
+      if (tagObj.isCustom) {
+        chip.innerHTML = `<span>✨ ${tagObj.name}</span> <span class="tag-delete-cross" title="Supprimer ce tag personnalisé" data-room="${roomName}" data-tag="${tagObj.name}">&times;</span>`;
+      } else {
+        chip.textContent = `${category.icon} ${tagObj.name}`;
+      }
+
+      chip.addEventListener("click", (e) => {
+        if (e.target.classList.contains("tag-delete-cross")) {
+          e.stopPropagation();
+          deleteCustomTag(roomName, tagObj.name);
+          return;
+        }
         toggleModalTag(fullTag);
       });
       DOM.modalTagsContainer.appendChild(chip);
     }
   }
+}
 
-  // Tags personnalisés ajoutés pour cette session
-  for (const fullTag of state.modal.customTags) {
-    const chip = document.createElement("button");
-    chip.type = "button";
-    chip.className = "tag-chip selected";
-    chip.textContent = `✨ ${fullTag}`;
-    chip.addEventListener("click", () => {
-      toggleModalTag(fullTag);
-    });
-    DOM.modalTagsContainer.appendChild(chip);
+function deleteCustomTag(roomName, tagName) {
+  if (confirm(`Supprimer définitivement la tâche personnalisée "${tagName}" de ${roomName} ?`)) {
+    state.customTagsByRoom = Core.removeCustomTagFromRoom(state.customTagsByRoom, roomName, tagName);
+    saveCustomTags();
+    const fullTag = `${roomName} > ${tagName}`;
+    const idx = state.modal.selectedTags.indexOf(fullTag);
+    if (idx >= 0) {
+      state.modal.selectedTags.splice(idx, 1);
+    }
+    renderModalTags();
+    showToast(`Tag "${tagName}" retiré de ${roomName}.`);
   }
 }
 
@@ -448,18 +486,43 @@ function onAddCustomTag() {
   const text = DOM.inputCustomTag.value.trim();
   if (!text) return;
 
-  const currentRoom = state.modal.selectedRooms[0] || "Autre";
-  const fullTag = text.includes(">") ? text : `${currentRoom} > ${text}`;
+  if (state.modal.selectedRooms.length === 0) {
+    showToast("Sélectionnez d'abord au moins une pièce ci-dessus pour y associer cette tâche.");
+    return;
+  }
 
+  // Déterminer la pièce cible (première sélectionnée ou pièce précisée dans le texte)
+  let targetRoom = state.modal.selectedRooms[0];
+  let cleanTagName = text;
+  if (text.includes(">")) {
+    const parts = text.split(">");
+    const parsedRoom = parts[0].trim();
+    const parsedTag = parts.slice(1).join(">").trim();
+    if (parsedRoom && parsedTag) {
+      targetRoom = parsedRoom;
+      cleanTagName = parsedTag;
+      if (!state.modal.selectedRooms.includes(targetRoom)) {
+        state.modal.selectedRooms.push(targetRoom);
+        renderModalRooms();
+      }
+    }
+  }
+
+  if (!cleanTagName) return;
+
+  // Persistance par pièce dans customTagsByRoom
+  state.customTagsByRoom = Core.addCustomTagToRoom(state.customTagsByRoom, targetRoom, cleanTagName);
+  saveCustomTags();
+
+  // Sélection immédiate du tag pour la session en cours
+  const fullTag = `${targetRoom} > ${cleanTagName}`;
   if (!state.modal.selectedTags.includes(fullTag)) {
     state.modal.selectedTags.push(fullTag);
-  }
-  if (!state.modal.customTags.includes(fullTag)) {
-    state.modal.customTags.push(fullTag);
   }
 
   DOM.inputCustomTag.value = "";
   renderModalTags();
+  showToast(`Tâche "${cleanTagName}" ajoutée à ${targetRoom} et mémorisée !`);
 }
 
 function saveModalTask() {

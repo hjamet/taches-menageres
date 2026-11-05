@@ -78,6 +78,61 @@ export const DEFAULT_TAXONOMY = [
   }
 ];
 
+export const STORAGE_KEY_CUSTOM_TAGS = "taches_menageres_custom_tags";
+
+export function getRoomTags(roomName, customTagsMap = {}) {
+  const category = DEFAULT_TAXONOMY.find((c) => c.room === roomName);
+  const defaultTags = category ? category.tags : [];
+  const customTags = (customTagsMap && Array.isArray(customTagsMap[roomName]))
+    ? customTagsMap[roomName]
+    : [];
+
+  const seen = new Set();
+  const result = [];
+  for (const t of defaultTags) {
+    if (!seen.has(t)) {
+      seen.add(t);
+      result.push({ name: t, isCustom: false });
+    }
+  }
+  for (const t of customTags) {
+    const clean = typeof t === "string" ? t.trim() : "";
+    if (clean && !seen.has(clean)) {
+      seen.add(clean);
+      result.push({ name: clean, isCustom: true });
+    }
+  }
+  return result;
+}
+
+export function addCustomTagToRoom(customTagsMap = {}, roomName, tagName) {
+  if (!roomName || !tagName) return { ...customTagsMap };
+  const cleanRoom = String(roomName).trim();
+  const cleanTag = String(tagName).trim();
+  if (!cleanRoom || !cleanTag) return { ...customTagsMap };
+
+  const current = (customTagsMap && Array.isArray(customTagsMap[cleanRoom]))
+    ? [...customTagsMap[cleanRoom]]
+    : [];
+  if (!current.includes(cleanTag)) {
+    current.push(cleanTag);
+  }
+  return {
+    ...customTagsMap,
+    [cleanRoom]: current
+  };
+}
+
+export function removeCustomTagFromRoom(customTagsMap = {}, roomName, tagName) {
+  if (!roomName || !tagName || !customTagsMap || !customTagsMap[roomName]) {
+    return { ...customTagsMap };
+  }
+  return {
+    ...customTagsMap,
+    [roomName]: customTagsMap[roomName].filter((t) => t !== tagName)
+  };
+}
+
 export function createTimerState() {
   return {
     status: "IDLE", // "IDLE" | "RUNNING" | "PAUSED"
@@ -529,6 +584,10 @@ export function parseAndMergeCsv(csvText, existingSessions = []) {
 if (typeof globalThis !== "undefined") {
   globalThis.ChoreCore = {
     DEFAULT_TAXONOMY,
+    STORAGE_KEY_CUSTOM_TAGS,
+    getRoomTags,
+    addCustomTagToRoom,
+    removeCustomTagFromRoom,
     createTimerState,
     startTimer,
     pauseTimer,
