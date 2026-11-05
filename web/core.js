@@ -1,3 +1,6 @@
+(function(global) {
+"use strict";
+
 /**
  * Moteur logique ChoreCore — Application Tâches Ménagères
  * Compatible Navigateur (Script classique window.Core / window.ChoreCore) et Node.js.
@@ -683,14 +686,11 @@ const Core = {
   parseAndMergeCsv
 };
 
-if (typeof window !== "undefined") {
-  window.Core = Core;
-  window.ChoreCore = Core;
-}
-if (typeof globalThis !== "undefined") {
-  globalThis.Core = Core;
-  globalThis.ChoreCore = Core;
-}
-if (typeof module !== "undefined" && module.exports) {
-  module.exports = Core;
-}
+  if (typeof global !== "undefined") {
+    global.Core = Core;
+    global.ChoreCore = Core;
+  }
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = Core;
+  }
+})(typeof window !== "undefined" ? window : (typeof globalThis !== "undefined" ? globalThis : this));

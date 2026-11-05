@@ -1,3 +1,6 @@
+(function() {
+"use strict";
+
 // Moteur Core global classique (compatibilité 100% WebView file:// Android)
 const Core = window.Core || window.ChoreCore;
 
@@ -718,7 +721,9 @@ function renderHistory() {
       ? startDate.toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
       : "";
 
+    const roomsHtml = (s.rooms || []).map((r) => `<span class="session-room-badge">📍 ${r}</span>`).join(" ");
     const tagsHtml = (s.tags || []).map((t) => `<span class="session-tag-badge">${t}</span>`).join(" ");
+    const badgesHtml = [roomsHtml, tagsHtml].filter(Boolean).join(" ");
 
     card.innerHTML = `
       <div class="session-card-header">
@@ -726,7 +731,7 @@ function renderHistory() {
         <span class="session-date">${dateFormatted}</span>
       </div>
       <div class="session-card-body">
-        <div class="session-tags">${tagsHtml || "<em>Général</em>"}</div>
+        <div class="session-tags">${badgesHtml || "<em>Général</em>"}</div>
         <div class="session-duration">${Core.formatDurationHm(s.durationSeconds)}</div>
       </div>
       ${s.note ? `<div class="session-note">${s.note}</div>` : ""}
@@ -981,3 +986,4 @@ if (document.readyState === "loading") {
 } else {
   initApp();
 }
+})();
