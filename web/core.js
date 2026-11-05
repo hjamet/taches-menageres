@@ -280,9 +280,9 @@ function formatDurationHms(totalSeconds) {
 }
 
 function formatDurationHm(totalSeconds) {
-  const s = Math.max(0, Math.floor(totalSeconds || 0));
-  const hours = Math.floor(s / 3600);
-  const minutes = Math.floor((s % 3600) / 60);
+  const totalMinutes = Math.round(Math.max(0, Number(totalSeconds) || 0) / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
   if (hours > 0) {
     return `${hours}h ${minutes}m`;
   }
@@ -375,6 +375,7 @@ function computeStats(sessions, filterPeriod = "all", refDate = new Date()) {
 
     // Statistiques par pièce
     const rooms = Array.isArray(s.rooms) && s.rooms.length > 0 ? s.rooms : ["Autre"];
+    const roomDur = dur / rooms.length;
     for (const r of rooms) {
       if (!roomMap.has(r)) {
         roomMap.set(r, {
@@ -388,19 +389,20 @@ function computeStats(sessions, filterPeriod = "all", refDate = new Date()) {
         });
       }
       const entry = roomMap.get(r);
-      entry.totalSeconds += dur;
+      entry.totalSeconds += roomDur;
       entry.count += 1;
       if (s.person === "Henri") {
-        entry.henriSeconds += dur;
+        entry.henriSeconds += roomDur;
         entry.henriCount += 1;
       } else {
-        entry.annabelleSeconds += dur;
+        entry.annabelleSeconds += roomDur;
         entry.annabelleCount += 1;
       }
     }
 
     // Statistiques par tag (nettoyage si ancien format "Pièce > Tag")
     const tags = Array.isArray(s.tags) && s.tags.length > 0 ? s.tags : ["Général"];
+    const tagDur = dur / tags.length;
     for (let rawTag of tags) {
       const t = rawTag.includes(" > ") ? rawTag.split(" > ")[1].trim() : rawTag.trim();
       if (!tagMap.has(t)) {
@@ -416,13 +418,13 @@ function computeStats(sessions, filterPeriod = "all", refDate = new Date()) {
         });
       }
       const entry = tagMap.get(t);
-      entry.totalSeconds += dur;
+      entry.totalSeconds += tagDur;
       entry.count += 1;
       if (s.person === "Henri") {
-        entry.henriSeconds += dur;
+        entry.henriSeconds += tagDur;
         entry.henriCount += 1;
       } else {
-        entry.annabelleSeconds += dur;
+        entry.annabelleSeconds += tagDur;
         entry.annabelleCount += 1;
       }
     }
