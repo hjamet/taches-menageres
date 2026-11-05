@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#0f172a">
   <title>Tâches Ménagères — Henri & Annabelle</title>
   <link rel="manifest" href="manifest.json">
@@ -17,11 +17,12 @@
       <span class="brand-title">Tâches Ménagères</span>
     </div>
 
-    <!-- Sélecteur de profil actif -->
-    <div class="profile-pill-selector" id="profileSelector">
-      <button type="button" class="profile-pill active" data-person="Henri">Henri</button>
-      <button type="button" class="profile-pill" data-person="Annabelle">Annabelle</button>
-    </div>
+    <!-- Pastille discrète de profil actif (cliquable pour changer de profil) -->
+    <button type="button" class="profile-chip" id="btnCurrentProfile" title="Changer de profil">
+      <span class="profile-chip-avatar" id="profileChipAvatar">👨</span>
+      <span class="profile-chip-name" id="profileChipName">Henri</span>
+      <span class="profile-chip-caret">▾</span>
+    </button>
   </header>
 
   <!-- Contenu des onglets -->
@@ -30,36 +31,45 @@
     <!-- ONGLET 1 : CHRONOMETRE -->
     <section id="panel-timer" class="tab-panel active">
       <div class="timer-view">
-        <div class="timer-card">
-          <div class="timer-status-badge" id="timerStatusBadge">
-            <span class="status-dot">●</span>
-            <span id="timerStatusText">Prêt à démarrer</span>
-          </div>
 
-          <div class="timer-digits" id="timerDigits">00:00:00</div>
-          <div class="timer-person-indicator" id="timerPersonIndicator">Profil actif : Henri</div>
-        </div>
-
-        <div class="timer-actions">
-          <button type="button" class="btn-primary-big" id="btnMainTimer">
-            <span id="btnMainTimerIcon">▶</span>
-            <span id="btnMainTimerLabel">DÉMARRER UNE TÂCHE</span>
-          </button>
-
-          <div class="timer-sub-actions" id="timerSubActions" style="display: none;">
-            <button type="button" class="btn-secondary" id="btnPauseTimer">
-              <span id="btnPauseIcon">⏸</span>
-              <span id="btnPauseLabel">Pause</span>
-            </button>
-            <button type="button" class="btn-secondary" id="btnCancelTimer">
-              <span>✕</span> Annuler
-            </button>
-          </div>
-
-          <button type="button" class="btn-ghost" id="btnManualEntry">
-            + Saisie manuelle d'une tâche passée
+        <!-- Gros bouton rond central -->
+        <div class="timer-round-wrapper">
+          <button type="button" class="big-round-btn idle" id="btnMainTimer" aria-label="Démarrer ou arrêter le chronomètre">
+            <div class="round-btn-inner">
+              <span class="round-btn-icon" id="btnMainTimerIcon">▶</span>
+              <span class="round-btn-digits" id="timerDigits">00:00:00</span>
+              <span class="round-btn-label" id="btnMainTimerLabel">DÉMARRER</span>
+            </div>
+            <div class="pulse-ring" id="pulseRing"></div>
           </button>
         </div>
+
+        <!-- Statut du timer -->
+        <div class="timer-status-badge" id="timerStatusBadge">
+          <span class="status-dot">●</span>
+          <span id="timerStatusText">Prêt à démarrer</span>
+        </div>
+
+        <div class="timer-person-indicator" id="timerPersonIndicator">Profil actif : Henri</div>
+
+        <!-- Sous-actions pendant le chronométrage (Pause / Annuler) -->
+        <div class="timer-sub-actions" id="timerSubActions" style="display: none;">
+          <button type="button" class="btn-secondary" id="btnPauseTimer">
+            <span id="btnPauseIcon">⏸</span>
+            <span id="btnPauseLabel">Pause</span>
+          </button>
+          <button type="button" class="btn-secondary btn-cancel" id="btnCancelTimer">
+            <span>✕</span> Annuler
+          </button>
+        </div>
+
+        <!-- Bouton Saisie Manuelle juste sous le chronomètre -->
+        <div class="manual-entry-container">
+          <button type="button" class="btn-manual-entry" id="btnManualEntry">
+            ➕ Saisie manuelle d'une tâche passée
+          </button>
+        </div>
+
       </div>
     </section>
 
@@ -145,6 +155,29 @@
 
   </main>
 
+  <!-- MODALE BIENVENUE / SÉLECTION DE PROFIL (PREMIER LANCEMENT OU CHANGEMENT) -->
+  <div class="modal-overlay" id="profileModal">
+    <div class="modal-content modal-profile-card">
+      <div class="modal-header">
+        <h2 class="modal-title" id="profileModalTitle">Bienvenue ! Qui utilise cet appareil ?</h2>
+        <button type="button" class="modal-close" id="btnProfileModalClose" style="display: none;">&times;</button>
+      </div>
+      <div class="modal-body profile-choice-body">
+        <p class="profile-choice-sub">Sélectionnez votre profil sur cet appareil. Vos tâches seront associées à ce compte par défaut.</p>
+        <div class="profile-cards-grid">
+          <button type="button" class="profile-big-card" data-person="Henri">
+            <span class="profile-big-avatar">👨</span>
+            <span class="profile-big-name">Henri</span>
+          </button>
+          <button type="button" class="profile-big-card" data-person="Annabelle">
+            <span class="profile-big-avatar">👩</span>
+            <span class="profile-big-name">Annabelle</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- MODALE DE QUALIFICATION / SAISIE DE TÂCHE -->
   <div class="modal-overlay" id="taskModal">
     <div class="modal-content">
@@ -160,7 +193,7 @@
           <div class="room-grid" id="modalRoomGrid"></div>
         </div>
 
-        <!-- Étape 2 : Choix des tags correspondants -->
+        <!-- Étape 2 : Choix des tags généraux correspondants -->
         <div>
           <label class="section-label">2. Choisir les tâches effectuées</label>
           <div class="tags-container" id="modalTagsContainer"></div>
@@ -216,12 +249,12 @@
   <!-- Conteneur des notifications toast -->
   <div class="toast-container" id="toastContainer"></div>
 
-  <!-- Scripts -->
-  <script type="module" src="core.js"></script>
-  <script type="module" src="app.js"></script>
+  <!-- Scripts classiques SANS type="module" (compatibilité totale file:// WebView Android) -->
+  <script src="core.js"></script>
+  <script src="app.js"></script>
   <script>
-    // Enregistrement PWA Service Worker si supporté
-    if ('serviceWorker' in navigator) {
+    // Enregistrement PWA Service Worker UNIQUEMENT si protocole http/https
+    if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
       window.addEventListener('load', () => {
         navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW register fail:', err));
       });

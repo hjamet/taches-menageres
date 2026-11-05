@@ -3,12 +3,16 @@ package com.henrijamet.tachesmenageres
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
 import androidx.core.content.FileProvider
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import java.io.File
 
 class MainActivity : ComponentActivity() {
@@ -74,15 +78,36 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Configuration des couleurs de barres système
+        window.statusBarColor = Color.parseColor("#0F172A")
+        window.navigationBarColor = Color.parseColor("#0F172A")
+
+        val container = FrameLayout(this).apply {
+            setBackgroundColor(Color.parseColor("#0F172A"))
+        }
+
         val webView = WebView(this).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             settings.allowFileAccess = true
+            settings.allowFileAccessFromFileURLs = true
+            settings.allowUniversalAccessFromFileURLs = true
             webViewClient = WebViewClient()
             addJavascriptInterface(AndroidNativeBridge(this@MainActivity), "AndroidNativeBridge")
             loadUrl("file:///android_asset/index.html")
         }
 
-        setContentView(webView)
+        container.addView(webView)
+
+        // Gestion Edge-to-Edge Android 15 (Pixel) : padding automatique contre status bar et barres de navigation
+        ViewCompat.setOnApplyWindowInsetsListener(container) { view, insets ->
+            val systemBars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
+            )
+            view.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+            insets
+        }
+
+        setContentView(container)
     }
 }

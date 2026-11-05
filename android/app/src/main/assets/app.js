@@ -1,29 +1,34 @@
-import * as Core from "./core.js";
+// Moteur Core global classique (compatibilité 100% WebView file:// Android)
+const Core = window.Core || window.ChoreCore;
 
 // Clés de persistance locale
 const STORAGE_KEY_SESSIONS = "taches_menageres_sessions";
-const STORAGE_KEY_PROFILE = "taches_menageres_active_profile";
+const STORAGE_KEY_USER = "taches_menageres_active_user";
+const STORAGE_KEY_PROFILE_LEGACY = "taches_menageres_active_profile";
 const STORAGE_KEY_TIMER = "taches_menageres_timer_state";
-const STORAGE_KEY_CUSTOM_TAGS = Core.STORAGE_KEY_CUSTOM_TAGS || "taches_menageres_custom_tags";
+const STORAGE_KEY_CUSTOM_TAGS = (Core && Core.STORAGE_KEY_CUSTOM_TAGS) || "taches_menageres_custom_tags";
 
 function loadCustomTags() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY_CUSTOM_TAGS);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      if (Array.isArray(parsed)) {
         return parsed;
+      }
+      if (parsed && typeof parsed === "object") {
+        return Object.values(parsed).flat().filter(Boolean);
       }
     }
   } catch (err) {
     console.error("Erreur lecture custom tags:", err);
   }
-  return {};
+  return [];
 }
 
 function saveCustomTags() {
   try {
-    localStorage.setItem(STORAGE_KEY_CUSTOM_TAGS, JSON.stringify(state.customTagsByRoom));
+    localStorage.setItem(STORAGE_KEY_CUSTOM_TAGS, JSON.stringify(state.customTags));
   } catch (err) {
     console.error("Erreur écriture custom tags:", err);
   }
@@ -31,13 +36,13 @@ function saveCustomTags() {
 
 // État global de l'application
 const state = {
-  activePerson: localStorage.getItem(STORAGE_KEY_PROFILE) || "Henri",
+  activePerson: localStorage.getItem(STORAGE_KEY_USER) || localStorage.getItem(STORAGE_KEY_PROFILE_LEGACY) || "",
   sessions: [],
   timerState: Core.createTimerState(),
   timerIntervalId: null,
   activeTab: "timer",
   statsPeriod: "all",
-  customTagsByRoom: loadCustomTags(),
+  customTags: loadCustomTags(),
 
   // État de la modale en cours
   modal: {
@@ -47,21 +52,27 @@ const state = {
     endTimeIso: null,
     durationSeconds: 0,
     selectedRooms: [],
-    selectedTags: [],
-    customTags: []
+    selectedTags: []
   }
 };
 
 // Éléments DOM
 const DOM = {
-  profileSelector: document.getElementById("profileSelector"),
+  // Profil Header & Modale Profil
+  btnCurrentProfile: document.getElementById("btnCurrentProfile"),
+  profileChipAvatar: document.getElementById("profileChipAvatar"),
+  profileChipName: document.getElementById("profileChipName"),
+  profileModal: document.getElementById("profileModal"),
+  btnProfileModalClose: document.getElementById("btnProfileModalClose"),
+
+  // Timer gros bouton rond
+  btnMainTimer: document.getElementById("btnMainTimer"),
+  btnMainTimerIcon: document.getElementById("btnMainTimerIcon"),
+  btnMainTimerLabel: document.getElementById("btnMainTimerLabel"),
   timerDigits: document.getElementById("timerDigits"),
   timerStatusBadge: document.getElementById("timerStatusBadge"),
   timerStatusText: document.getElementById("timerStatusText"),
   timerPersonIndicator: document.getElementById("timerPersonIndicator"),
-  btnMainTimer: document.getElementById("btnMainTimer"),
-  btnMainTimerIcon: document.getElementById("btnMainTimerIcon"),
-  btnMainTimerLabel: document.getElementById("btnMainTimerLabel"),
   timerSubActions: document.getElementById("timerSubActions"),
   btnPauseTimer: document.getElementById("btnPauseTimer"),
   btnPauseIcon: document.getElementById("btnPauseIcon"),
@@ -74,7 +85,7 @@ const DOM = {
   tabButtons: document.querySelectorAll(".tab-btn"),
   tabPanels: document.querySelectorAll(".tab-panel"),
 
-  // Modal
+  // Modal qualification tâche
   taskModal: document.getElementById("taskModal"),
   modalTitle: document.getElementById("modalTitle"),
   modalRoomGrid: document.getElementById("modalRoomGrid"),
@@ -144,13 +155,29 @@ function loadSessions() {
     try {
       const nativeRaw = window.AndroidNativeBridge.loadBackupJson();
       if (nativeRaw && nativeRaw.trim().length > 0) {
-        const nativeList = JSON.parse(nativeRaw);
-        if (Array.isArray(nativeList)) {
-          // Fusionner avec ce qui est en local
+        const parsed = JSON.parse(nativeRaw);
+        if (Array.isArray(parsed)) {
+          // Format brut V1 (tableau de sessions)
           const map = new Map();
-          for (const s of nativeList) if (s && s.id) map.set(s.id, s);
+          for (const s of parsed) if (s && s.id) map.set(s.id, s);
           for (const s of loaded) if (s && s.id) map.set(s.id, s);
           loaded = Array.from(map.values());
+        } else if (parsed && typeof parsed === "object") {
+          // Format structuré V2
+          if (Array.isArray(parsed.sessions)) {
+            const map = new Map();
+            for (const s of parsed.sessions) if (s && s.id) map.set(s.id, s);
+            for (const s of loaded) if (s && s.id) map.set(s.id, s);
+            loaded = Array.from(map.values());
+          }
+          if (Array.isArray(parsed.customTags) && state.customTags.length === 0) {
+            state.customTags = parsed.customTags;
+            saveCustomTags();
+          }
+          if (parsed.activeUser && !state.activePerson) {
+            state.activePerson = parsed.activeUser;
+            localStorage.setItem(STORAGE_KEY_USER, parsed.activeUser);
+          }
         }
       }
     } catch (err) {
@@ -168,10 +195,16 @@ function saveSessions() {
     console.error("Erreur écriture localStorage:", err);
   }
 
-  // Sauvegarde native Android indestructible
+  // Sauvegarde native Android indestructible (avec customTags et profil actif)
   if (window.AndroidNativeBridge && typeof window.AndroidNativeBridge.saveBackupJson === "function") {
     try {
-      window.AndroidNativeBridge.saveBackupJson(JSON.stringify(state.sessions));
+      const backupPayload = JSON.stringify({
+        version: 2,
+        activeUser: state.activePerson,
+        customTags: state.customTags,
+        sessions: state.sessions
+      });
+      window.AndroidNativeBridge.saveBackupJson(backupPayload);
     } catch (err) {
       console.warn("Erreur sauvegarde AndroidNativeBridge:", err);
     }
@@ -183,34 +216,51 @@ function saveSessions() {
 
 async function syncToServer() {
   try {
-    // Tente de poster les sessions vers l'API SQLite locale
     fetch("/api/sessions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(state.sessions)
     }).catch(() => {
-      // Serveur non démarré ou hors ligne, fonctionnement autonome normal
+      // Hors-ligne normal
     });
   } catch {
-    // Hors ligne
+    // Hors-ligne
   }
 }
 
-// Gestion du profil actif
+// Gestion du profil actif (Henri ou Annabelle)
 function setProfile(person) {
-  state.activePerson = person;
-  localStorage.setItem(STORAGE_KEY_PROFILE, person);
+  if (!person || (person !== "Henri" && person !== "Annabelle")) {
+    person = "Henri";
+  }
 
-  document.querySelectorAll(".profile-pill").forEach((pill) => {
-    if (pill.dataset.person === person) {
-      pill.classList.add("active");
-    } else {
-      pill.classList.remove("active");
-    }
-  });
+  state.activePerson = person;
+  localStorage.setItem(STORAGE_KEY_USER, person);
+  localStorage.setItem(STORAGE_KEY_PROFILE_LEGACY, person);
+
+  // Mettre à jour la pastille dans l'en-tête
+  DOM.profileChipName.textContent = person;
+  DOM.profileChipAvatar.textContent = person === "Annabelle" ? "👩" : "👨";
+  DOM.btnCurrentProfile.className = `profile-chip ${person.toLowerCase()}`;
 
   DOM.timerPersonIndicator.textContent = `Profil actif : ${person}`;
+
+  // Fermer la modale de profil si elle était ouverte
+  closeProfileModal();
+
+  // Sauvegarder dans AndroidNativeBridge
+  saveSessions();
+
   renderStats();
+}
+
+function openProfileModal(canClose = true) {
+  DOM.btnProfileModalClose.style.display = canClose ? "block" : "none";
+  DOM.profileModal.classList.add("open");
+}
+
+function closeProfileModal() {
+  DOM.profileModal.classList.remove("open");
 }
 
 // Gestion des onglets
@@ -266,9 +316,10 @@ function updateTimerDisplay() {
       : "";
     DOM.timerStatusText.textContent = `En cours (depuis ${startTimeStr})`;
 
-    DOM.btnMainTimer.className = "btn-primary-big stop";
+    // Gros bouton rond : état RUNNING
+    DOM.btnMainTimer.className = "big-round-btn running";
     DOM.btnMainTimerIcon.textContent = "⏹";
-    DOM.btnMainTimerLabel.textContent = "TERMINER & TAGUER";
+    DOM.btnMainTimerLabel.textContent = "ARRÊTER & QUALIFIER";
 
     DOM.timerSubActions.style.display = "flex";
     DOM.btnPauseIcon.textContent = "⏸";
@@ -277,9 +328,10 @@ function updateTimerDisplay() {
     DOM.timerStatusBadge.className = "timer-status-badge paused";
     DOM.timerStatusText.textContent = "En pause";
 
-    DOM.btnMainTimer.className = "btn-primary-big stop";
-    DOM.btnMainTimerIcon.textContent = "⏹";
-    DOM.btnMainTimerLabel.textContent = "TERMINER & TAGUER";
+    // Gros bouton rond : état PAUSED
+    DOM.btnMainTimer.className = "big-round-btn paused";
+    DOM.btnMainTimerIcon.textContent = "▶";
+    DOM.btnMainTimerLabel.textContent = "REPRENDRE";
 
     DOM.timerSubActions.style.display = "flex";
     DOM.btnPauseIcon.textContent = "▶";
@@ -288,9 +340,10 @@ function updateTimerDisplay() {
     DOM.timerStatusBadge.className = "timer-status-badge";
     DOM.timerStatusText.textContent = "Prêt à démarrer";
 
-    DOM.btnMainTimer.className = "btn-primary-big";
+    // Gros bouton rond : état IDLE
+    DOM.btnMainTimer.className = "big-round-btn idle";
     DOM.btnMainTimerIcon.textContent = "▶";
-    DOM.btnMainTimerLabel.textContent = "DÉMARRER UNE TÂCHE";
+    DOM.btnMainTimerLabel.textContent = "DÉMARRER";
 
     DOM.timerSubActions.style.display = "none";
   }
@@ -319,7 +372,12 @@ function onMainTimerClick() {
     saveTimerState();
     updateTimerDisplay();
     startTimerTick();
-    showToast(`Chronomètre démarré pour ${state.activePerson}`);
+    showToast(`Chronomètre démarré pour ${state.activePerson || "Henri"}`);
+  } else if (state.timerState.status === "PAUSED") {
+    // Reprise du chronomètre
+    state.timerState = Core.resumeTimer(state.timerState);
+    saveTimerState();
+    updateTimerDisplay();
   } else {
     // Arrêt et ouverture de la modale de qualification
     const finalElapsed = Core.getElapsedSeconds(state.timerState);
@@ -368,7 +426,6 @@ function openQualificationModal({ isManual = false, startIso, endIso, durationSe
   state.modal.durationSeconds = durationSeconds;
   state.modal.selectedRooms = [];
   state.modal.selectedTags = [];
-  state.modal.customTags = [];
 
   DOM.modalTitle.textContent = isManual ? "Saisie manuelle d'une tâche" : "Qualifier la tâche terminée";
   const durationMinutes = Math.max(1, Math.round(durationSeconds / 60));
@@ -388,6 +445,7 @@ function closeModal() {
   DOM.taskModal.classList.remove("open");
 }
 
+// Étape 1 : Pièces (multi-sélection libre)
 function renderModalRooms() {
   DOM.modalRoomGrid.innerHTML = "";
   for (const item of Core.DEFAULT_TAXONOMY) {
@@ -413,96 +471,80 @@ function toggleModalRoom(roomName) {
     state.modal.selectedRooms.push(roomName);
   }
   renderModalRooms();
-  renderModalTags();
 }
 
+// Étape 2 : Tags généraux (toujours visibles, découplés des pièces)
 function renderModalTags() {
   DOM.modalTagsContainer.innerHTML = "";
 
-  // Si aucune pièce n'est sélectionnée, inviter à en choisir une
-  if (state.modal.selectedRooms.length === 0) {
-    DOM.modalTagsContainer.innerHTML = `<span style="font-size:0.85rem; color:var(--text-dim); padding:6px 0;">Sélectionnez au moins une pièce ci-dessus pour afficher ses tâches.</span>`;
-    return;
-  }
+  const allTags = Core.getAllTags(state.customTags);
 
-  // Récupérer tous les tags des pièces sélectionnées (défaut + personnalisés persistés)
-  for (const roomName of state.modal.selectedRooms) {
-    const category = Core.DEFAULT_TAXONOMY.find((t) => t.room === roomName) || { icon: "🏠" };
-    const roomTags = Core.getRoomTags(roomName, state.customTagsByRoom);
-
-    for (const tagObj of roomTags) {
-      const fullTag = `${roomName} > ${tagObj.name}`;
-      const chip = document.createElement("button");
-      chip.type = "button";
-      chip.className = "tag-chip";
-      if (state.modal.selectedTags.includes(fullTag)) {
-        chip.classList.add("selected");
-      }
-
-      if (tagObj.isCustom) {
-        chip.innerHTML = `<span>✨ ${tagObj.name}</span> <span class="tag-delete-cross" title="Supprimer ce tag personnalisé" data-room="${roomName}" data-tag="${tagObj.name}">&times;</span>`;
-      } else {
-        chip.textContent = `${category.icon} ${tagObj.name}`;
-      }
-
-      chip.addEventListener("click", (e) => {
-        if (e.target.classList.contains("tag-delete-cross")) {
-          e.stopPropagation();
-          deleteCustomTag(roomName, tagObj.name);
-          return;
-        }
-        toggleModalTag(fullTag);
-      });
-      DOM.modalTagsContainer.appendChild(chip);
+  for (const tagObj of allTags) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "tag-chip";
+    if (state.modal.selectedTags.includes(tagObj.name)) {
+      chip.classList.add("selected");
     }
+
+    if (tagObj.isCustom) {
+      chip.innerHTML = `<span>✨ ${tagObj.name}</span> <span class="tag-delete-cross" title="Supprimer ce tag personnalisé" data-tag="${tagObj.name}">&times;</span>`;
+    } else {
+      chip.textContent = tagObj.name;
+    }
+
+    chip.addEventListener("click", (e) => {
+      if (e.target.classList.contains("tag-delete-cross")) {
+        e.stopPropagation();
+        deleteCustomTag(tagObj.name);
+        return;
+      }
+      toggleModalTag(tagObj.name);
+    });
+
+    DOM.modalTagsContainer.appendChild(chip);
   }
 }
 
-function deleteCustomTag(roomName, tagName) {
-  if (confirm(`Supprimer définitivement la tâche personnalisée "${tagName}" de ${roomName} ?`)) {
-    state.customTagsByRoom = Core.removeCustomTagFromRoom(state.customTagsByRoom, roomName, tagName);
+function deleteCustomTag(tagName) {
+  if (confirm(`Supprimer définitivement la tâche personnalisée "${tagName}" ?`)) {
+    state.customTags = Core.removeCustomTag(state.customTags, tagName);
     saveCustomTags();
-    const fullTag = `${roomName} > ${tagName}`;
-    const idx = state.modal.selectedTags.indexOf(fullTag);
+    saveSessions(); // synchronise le backup Android native
+
+    const idx = state.modal.selectedTags.indexOf(tagName);
     if (idx >= 0) {
       state.modal.selectedTags.splice(idx, 1);
     }
     renderModalTags();
-    showToast(`Tag "${tagName}" retiré de ${roomName}.`);
+    showToast(`Tag personnalisé "${tagName}" supprimé.`);
   }
 }
 
-function toggleModalTag(fullTag) {
-  const idx = state.modal.selectedTags.indexOf(fullTag);
+function toggleModalTag(tagName) {
+  const idx = state.modal.selectedTags.indexOf(tagName);
   if (idx >= 0) {
     state.modal.selectedTags.splice(idx, 1);
   } else {
-    state.modal.selectedTags.push(fullTag);
+    state.modal.selectedTags.push(tagName);
   }
   renderModalTags();
 }
 
 function onAddCustomTag() {
-  const text = DOM.inputCustomTag.value.trim();
-  if (!text) return;
+  const rawText = DOM.inputCustomTag.value.trim();
+  if (!rawText) return;
 
-  if (state.modal.selectedRooms.length === 0) {
-    showToast("Sélectionnez d'abord au moins une pièce ci-dessus pour y associer cette tâche.");
-    return;
-  }
-
-  // Déterminer la pièce cible (première sélectionnée ou pièce précisée dans le texte)
-  let targetRoom = state.modal.selectedRooms[0];
-  let cleanTagName = text;
-  if (text.includes(">")) {
-    const parts = text.split(">");
+  // Analyser si l'utilisateur a préfixé par une pièce (ex: "Cuisine > Nettoyer micro-ondes")
+  let cleanTagName = rawText;
+  if (rawText.includes(">")) {
+    const parts = rawText.split(">");
     const parsedRoom = parts[0].trim();
     const parsedTag = parts.slice(1).join(">").trim();
     if (parsedRoom && parsedTag) {
-      targetRoom = parsedRoom;
       cleanTagName = parsedTag;
-      if (!state.modal.selectedRooms.includes(targetRoom)) {
-        state.modal.selectedRooms.push(targetRoom);
+      if (!state.modal.selectedRooms.includes(parsedRoom)) {
+        state.modal.selectedRooms.push(parsedRoom);
         renderModalRooms();
       }
     }
@@ -510,19 +552,19 @@ function onAddCustomTag() {
 
   if (!cleanTagName) return;
 
-  // Persistance par pièce dans customTagsByRoom
-  state.customTagsByRoom = Core.addCustomTagToRoom(state.customTagsByRoom, targetRoom, cleanTagName);
+  // Ajout du tag général persistant
+  state.customTags = Core.addCustomTag(state.customTags, cleanTagName);
   saveCustomTags();
+  saveSessions(); // sauvegarde Android native
 
-  // Sélection immédiate du tag pour la session en cours
-  const fullTag = `${targetRoom} > ${cleanTagName}`;
-  if (!state.modal.selectedTags.includes(fullTag)) {
-    state.modal.selectedTags.push(fullTag);
+  // Sélectionner le tag pour la tâche en cours
+  if (!state.modal.selectedTags.includes(cleanTagName)) {
+    state.modal.selectedTags.push(cleanTagName);
   }
 
   DOM.inputCustomTag.value = "";
   renderModalTags();
-  showToast(`Tâche "${cleanTagName}" ajoutée à ${targetRoom} et mémorisée !`);
+  showToast(`Tâche "${cleanTagName}" ajoutée à vos tâches !`);
 }
 
 function saveModalTask() {
@@ -531,10 +573,10 @@ function saveModalTask() {
   const note = DOM.inputNote.value.trim();
 
   const rooms = state.modal.selectedRooms.length > 0 ? [...state.modal.selectedRooms] : ["Général"];
-  const tags = state.modal.selectedTags.length > 0 ? [...state.modal.selectedTags] : [`${rooms[0]} > Tâche générale`];
+  const tags = state.modal.selectedTags.length > 0 ? [...state.modal.selectedTags] : ["Tâche générale"];
 
   const newSession = Core.createSessionRecord({
-    person: state.activePerson,
+    person: state.activePerson || "Henri",
     startIso: state.modal.startTimeIso,
     endIso: state.modal.endTimeIso,
     durationSeconds: finalDurationSeconds,
@@ -558,7 +600,6 @@ function saveModalTask() {
   closeModal();
   showToast(`Tâche enregistrée (${Core.formatDurationHm(finalDurationSeconds)}) !`);
 
-  // Rafraîchir les autres vues
   renderStats();
   renderHistory();
 }
@@ -662,7 +703,7 @@ function renderHistory() {
       <div class="empty-state">
         <div class="empty-state-icon">📋</div>
         <p><strong>Aucune session enregistrée (0 tâche).</strong></p>
-        <p>Démarrez un chronomètre ou importez un fichier CSV pour commencer.</p>
+        <p>Démarrez un chronomètre ou saisissez une tâche passée pour commencer.</p>
       </div>
     `;
     return;
@@ -769,7 +810,13 @@ function handleCsvFileSelect(e) {
 
 // Export / Import JSON
 function exportJson() {
-  const data = JSON.stringify(state.sessions, null, 2);
+  const payload = {
+    version: 2,
+    activeUser: state.activePerson,
+    customTags: state.customTags,
+    sessions: state.sessions
+  };
+  const data = JSON.stringify(payload, null, 2);
   const blob = new Blob([data], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -790,11 +837,26 @@ function handleJsonFileSelect(e) {
   reader.onload = (event) => {
     try {
       const parsed = JSON.parse(event.target.result);
+      let sessionList = [];
+
       if (Array.isArray(parsed)) {
+        sessionList = parsed;
+      } else if (parsed && typeof parsed === "object") {
+        if (Array.isArray(parsed.sessions)) sessionList = parsed.sessions;
+        if (Array.isArray(parsed.customTags)) {
+          state.customTags = parsed.customTags;
+          saveCustomTags();
+        }
+        if (parsed.activeUser) {
+          setProfile(parsed.activeUser);
+        }
+      }
+
+      if (sessionList.length > 0 || Array.isArray(sessionList)) {
         const map = new Map();
         for (const s of state.sessions) if (s && s.id) map.set(s.id, s);
         let added = 0;
-        for (const s of parsed) {
+        for (const s of sessionList) {
           if (s && s.id && !map.has(s.id)) {
             map.set(s.id, s);
             added++;
@@ -808,7 +870,7 @@ function handleJsonFileSelect(e) {
         renderStats();
         showToast(`${added} sessions restaurées depuis le fichier JSON.`);
       } else {
-        alert("Format JSON non valide (attendu: tableau de sessions).");
+        alert("Format JSON non valide.");
       }
     } catch (err) {
       alert("Erreur lecture JSON: " + err.message);
@@ -820,13 +882,23 @@ function handleJsonFileSelect(e) {
 
 // Initialisation des écouteurs d'événements
 function initEventListeners() {
-  // Profil
-  DOM.profileSelector.addEventListener("click", (e) => {
-    const pill = e.target.closest(".profile-pill");
-    if (pill) {
-      setProfile(pill.dataset.person);
-    }
+  // Clic sur la pastille profil dans le header pour changer de profil
+  DOM.btnCurrentProfile.addEventListener("click", () => {
+    openProfileModal(true);
   });
+
+  // Choix dans la modale de profil (cartes Henri et Annabelle)
+  document.querySelectorAll(".profile-big-card").forEach((card) => {
+    card.addEventListener("click", () => {
+      const person = card.dataset.person;
+      if (person) {
+        setProfile(person);
+        showToast(`Profil actif : ${person}`);
+      }
+    });
+  });
+
+  DOM.btnProfileModalClose.addEventListener("click", closeProfileModal);
 
   // Onglets
   DOM.tabButtons.forEach((btn) => {
@@ -835,7 +907,7 @@ function initEventListeners() {
     });
   });
 
-  // Timer
+  // Timer (Gros bouton rond)
   DOM.btnMainTimer.addEventListener("click", onMainTimerClick);
   DOM.btnPauseTimer.addEventListener("click", onPauseTimerClick);
   DOM.btnCancelTimer.addEventListener("click", onCancelTimerClick);
@@ -843,7 +915,7 @@ function initEventListeners() {
     openQualificationModal({ isManual: true });
   });
 
-  // Modale
+  // Modale Qualification
   DOM.btnModalClose.addEventListener("click", closeModal);
   DOM.btnModalCancel.addEventListener("click", closeModal);
   DOM.btnModalSave.addEventListener("click", saveModalTask);
@@ -884,15 +956,24 @@ function initEventListeners() {
 }
 
 // Initialisation globale
-export function initApp() {
+function initApp() {
   loadSessions();
   initEventListeners();
-  setProfile(state.activePerson);
+
+  // Si aucun profil n'est défini (premier lancement), afficher la modale obligatoire de bienvenue
+  if (!state.activePerson) {
+    openProfileModal(false);
+  } else {
+    setProfile(state.activePerson);
+  }
+
   restoreTimerState();
   updateTimerDisplay();
   renderStats();
   renderHistory();
 }
+
+window.initApp = initApp;
 
 // Démarrer l'application au chargement du DOM
 if (document.readyState === "loading") {

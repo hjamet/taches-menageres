@@ -1,9 +1,10 @@
 /**
  * Moteur logique ChoreCore — Application Tâches Ménagères
- * Compatible Navigateur (ES module et Global window.ChoreCore) et Node.js.
+ * Compatible Navigateur (Script classique window.Core / window.ChoreCore) et Node.js.
+ * AUCUN export/import ES module pour compatibilité 100% WebView file:// Android.
  */
 
-export const DEFAULT_TAXONOMY = [
+const DEFAULT_TAXONOMY = [
   {
     room: "Cuisine",
     icon: "🍳",
@@ -78,9 +79,86 @@ export const DEFAULT_TAXONOMY = [
   }
 ];
 
-export const STORAGE_KEY_CUSTOM_TAGS = "taches_menageres_custom_tags";
+const DEFAULT_GENERAL_TAGS = [
+  "Vaisselle",
+  "Rangement vaisselle",
+  "Plan de travail",
+  "Etendoir",
+  "Courses",
+  "Four",
+  "Poubelles",
+  "Alu + pet + verre",
+  "Compost",
+  "Frigo",
+  "Robot",
+  "Laver baignoire",
+  "Laver évier",
+  "Laver toilettes",
+  "Déboucher lavabo",
+  "Sol",
+  "Rangement",
+  "Lessive",
+  "Etendre",
+  "Pliage",
+  "Ranger",
+  "Canapé",
+  "Débarrasser",
+  "Changer les draps",
+  "Chaussures",
+  "Vitres"
+];
 
-export function getRoomTags(roomName, customTagsMap = {}) {
+const STORAGE_KEY_CUSTOM_TAGS = "taches_menageres_custom_tags";
+
+function getAllTags(customTags = []) {
+  const seen = new Set();
+  const result = [];
+
+  for (const t of DEFAULT_GENERAL_TAGS) {
+    if (!seen.has(t)) {
+      seen.add(t);
+      result.push({ name: t, isCustom: false });
+    }
+  }
+
+  const list = Array.isArray(customTags)
+    ? customTags
+    : (customTags && typeof customTags === "object" ? Object.values(customTags).flat() : []);
+
+  for (const ct of list) {
+    const clean = typeof ct === "string" ? ct.trim() : "";
+    if (clean && !seen.has(clean)) {
+      seen.add(clean);
+      result.push({ name: clean, isCustom: true });
+    }
+  }
+
+  return result;
+}
+
+function addCustomTag(customTags = [], tagName) {
+  const clean = typeof tagName === "string" ? tagName.trim() : "";
+  if (!clean) return Array.isArray(customTags) ? [...customTags] : [];
+
+  let list = Array.isArray(customTags)
+    ? [...customTags]
+    : (customTags && typeof customTags === "object" ? Object.values(customTags).flat() : []);
+
+  if (!DEFAULT_GENERAL_TAGS.includes(clean) && !list.includes(clean)) {
+    list.push(clean);
+  }
+  return list;
+}
+
+function removeCustomTag(customTags = [], tagName) {
+  let list = Array.isArray(customTags)
+    ? [...customTags]
+    : (customTags && typeof customTags === "object" ? Object.values(customTags).flat() : []);
+  return list.filter((t) => t !== tagName);
+}
+
+// Compatibilité rétroactive par pièce
+function getRoomTags(roomName, customTagsMap = {}) {
   const category = DEFAULT_TAXONOMY.find((c) => c.room === roomName);
   const defaultTags = category ? category.tags : [];
   const customTags = (customTagsMap && Array.isArray(customTagsMap[roomName]))
@@ -105,7 +183,7 @@ export function getRoomTags(roomName, customTagsMap = {}) {
   return result;
 }
 
-export function addCustomTagToRoom(customTagsMap = {}, roomName, tagName) {
+function addCustomTagToRoom(customTagsMap = {}, roomName, tagName) {
   if (!roomName || !tagName) return { ...customTagsMap };
   const cleanRoom = String(roomName).trim();
   const cleanTag = String(tagName).trim();
@@ -123,7 +201,7 @@ export function addCustomTagToRoom(customTagsMap = {}, roomName, tagName) {
   };
 }
 
-export function removeCustomTagFromRoom(customTagsMap = {}, roomName, tagName) {
+function removeCustomTagFromRoom(customTagsMap = {}, roomName, tagName) {
   if (!roomName || !tagName || !customTagsMap || !customTagsMap[roomName]) {
     return { ...customTagsMap };
   }
@@ -133,7 +211,7 @@ export function removeCustomTagFromRoom(customTagsMap = {}, roomName, tagName) {
   };
 }
 
-export function createTimerState() {
+function createTimerState() {
   return {
     status: "IDLE", // "IDLE" | "RUNNING" | "PAUSED"
     startTimeMs: null,
@@ -142,7 +220,7 @@ export function createTimerState() {
   };
 }
 
-export function startTimer(state, nowMs = Date.now()) {
+function startTimer(state, nowMs = Date.now()) {
   return {
     status: "RUNNING",
     startTimeMs: nowMs,
@@ -151,7 +229,7 @@ export function startTimer(state, nowMs = Date.now()) {
   };
 }
 
-export function pauseTimer(state, nowMs = Date.now()) {
+function pauseTimer(state, nowMs = Date.now()) {
   if (state.status !== "RUNNING") return { ...state };
   const currentElapsed = Math.max(0, nowMs - (state.startTimeMs || nowMs));
   return {
@@ -162,7 +240,7 @@ export function pauseTimer(state, nowMs = Date.now()) {
   };
 }
 
-export function resumeTimer(state, nowMs = Date.now()) {
+function resumeTimer(state, nowMs = Date.now()) {
   if (state.status !== "PAUSED") return { ...state };
   return {
     status: "RUNNING",
@@ -172,7 +250,7 @@ export function resumeTimer(state, nowMs = Date.now()) {
   };
 }
 
-export function getElapsedSeconds(state, nowMs = Date.now()) {
+function getElapsedSeconds(state, nowMs = Date.now()) {
   if (!state || state.status === "IDLE") return 0;
   let totalMs = state.accumulatedMs || 0;
   if (state.status === "RUNNING" && state.startTimeMs) {
@@ -181,7 +259,7 @@ export function getElapsedSeconds(state, nowMs = Date.now()) {
   return Math.floor(totalMs / 1000);
 }
 
-export function stopTimer(state, nowMs = Date.now()) {
+function stopTimer(state, nowMs = Date.now()) {
   const durationSeconds = getElapsedSeconds(state, nowMs);
   return {
     durationSeconds,
@@ -189,7 +267,7 @@ export function stopTimer(state, nowMs = Date.now()) {
   };
 }
 
-export function formatDurationHms(totalSeconds) {
+function formatDurationHms(totalSeconds) {
   const s = Math.max(0, Math.floor(totalSeconds || 0));
   const hours = Math.floor(s / 3600);
   const minutes = Math.floor((s % 3600) / 60);
@@ -198,7 +276,7 @@ export function formatDurationHms(totalSeconds) {
   return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 }
 
-export function formatDurationHm(totalSeconds) {
+function formatDurationHm(totalSeconds) {
   const s = Math.max(0, Math.floor(totalSeconds || 0));
   const hours = Math.floor(s / 3600);
   const minutes = Math.floor((s % 3600) / 60);
@@ -208,13 +286,13 @@ export function formatDurationHm(totalSeconds) {
   return `${minutes}m`;
 }
 
-export function generateSessionId() {
+function generateSessionId() {
   const ts = Date.now().toString(36);
   const rand = Math.random().toString(36).substring(2, 8);
   return `ses_${ts}_${rand}`;
 }
 
-export function createSessionRecord({
+function createSessionRecord({
   id = generateSessionId(),
   person = "Henri",
   startIso = new Date().toISOString(),
@@ -243,7 +321,7 @@ export function createSessionRecord({
   };
 }
 
-export function computeStats(sessions, filterPeriod = "all", refDate = new Date()) {
+function computeStats(sessions, filterPeriod = "all", refDate = new Date()) {
   const validSessions = Array.isArray(sessions) ? sessions : [];
   const refTimeMs = refDate.getTime();
 
@@ -318,9 +396,10 @@ export function computeStats(sessions, filterPeriod = "all", refDate = new Date(
       }
     }
 
-    // Statistiques par tag
+    // Statistiques par tag (nettoyage si ancien format "Pièce > Tag")
     const tags = Array.isArray(s.tags) && s.tags.length > 0 ? s.tags : ["Général"];
-    for (const t of tags) {
+    for (let rawTag of tags) {
+      const t = rawTag.includes(" > ") ? rawTag.split(" > ")[1].trim() : rawTag.trim();
       if (!tagMap.has(t)) {
         tagMap.set(t, {
           tag: t,
@@ -381,7 +460,7 @@ function escapeCsvField(field) {
   return str;
 }
 
-export function sessionsToCsv(sessions) {
+function sessionsToCsv(sessions) {
   const header = "id,date,start_time,end_time,duration_seconds,duration_hm,person,rooms,tags,note";
   const rows = [header];
 
@@ -428,7 +507,6 @@ export function sessionsToCsv(sessions) {
 }
 
 function parseCsvRows(csvText) {
-  // Enlève BOM éventuel
   let text = csvText.startsWith("\uFEFF") ? csvText.slice(1) : csvText;
   const rows = [];
   let currentRow = [];
@@ -442,7 +520,7 @@ function parseCsvRows(csvText) {
     if (inQuotes) {
       if (char === "\"" && nextChar === "\"") {
         currentField += "\"";
-        i++; // skip escaped quote
+        i++;
       } else if (char === "\"") {
         inQuotes = false;
       } else {
@@ -479,7 +557,7 @@ function parseCsvRows(csvText) {
   return rows;
 }
 
-export function parseAndMergeCsv(csvText, existingSessions = []) {
+function parseAndMergeCsv(csvText, existingSessions = []) {
   if (!csvText || typeof csvText !== "string") {
     return {
       mergedSessions: [...existingSessions],
@@ -520,7 +598,7 @@ export function parseAndMergeCsv(csvText, existingSessions = []) {
 
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
-    if (row.length === 1 && row[0].trim() === "") continue; // ligne vide
+    if (row.length === 1 && row[0].trim() === "") continue;
 
     const id = (idIdx >= 0 && row[idIdx]) ? row[idIdx].trim() : generateSessionId();
     if (existingMap.has(id)) {
@@ -540,7 +618,6 @@ export function parseAndMergeCsv(csvText, existingSessions = []) {
     const rooms = roomsRaw ? roomsRaw.split(";").map((x) => x.trim()).filter(Boolean) : [];
     const tags = tagsRaw ? tagsRaw.split(";").map((x) => x.trim()).filter(Boolean) : [];
 
-    // Reconstitution ISO
     let startIso = new Date().toISOString();
     let endIso = new Date().toISOString();
     if (dateStr) {
@@ -580,26 +657,40 @@ export function parseAndMergeCsv(csvText, existingSessions = []) {
   };
 }
 
-// Attacher à globalThis pour compatibilité script classique <script src="core.js">
+// Objet Core exposé globalement (compatible script classique)
+const Core = {
+  DEFAULT_TAXONOMY,
+  DEFAULT_GENERAL_TAGS,
+  STORAGE_KEY_CUSTOM_TAGS,
+  getAllTags,
+  addCustomTag,
+  removeCustomTag,
+  getRoomTags,
+  addCustomTagToRoom,
+  removeCustomTagFromRoom,
+  createTimerState,
+  startTimer,
+  pauseTimer,
+  resumeTimer,
+  getElapsedSeconds,
+  stopTimer,
+  formatDurationHms,
+  formatDurationHm,
+  generateSessionId,
+  createSessionRecord,
+  computeStats,
+  sessionsToCsv,
+  parseAndMergeCsv
+};
+
+if (typeof window !== "undefined") {
+  window.Core = Core;
+  window.ChoreCore = Core;
+}
 if (typeof globalThis !== "undefined") {
-  globalThis.ChoreCore = {
-    DEFAULT_TAXONOMY,
-    STORAGE_KEY_CUSTOM_TAGS,
-    getRoomTags,
-    addCustomTagToRoom,
-    removeCustomTagFromRoom,
-    createTimerState,
-    startTimer,
-    pauseTimer,
-    resumeTimer,
-    getElapsedSeconds,
-    stopTimer,
-    formatDurationHms,
-    formatDurationHm,
-    generateSessionId,
-    createSessionRecord,
-    computeStats,
-    sessionsToCsv,
-    parseAndMergeCsv
-  };
+  globalThis.Core = Core;
+  globalThis.ChoreCore = Core;
+}
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = Core;
 }
